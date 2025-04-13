@@ -325,52 +325,31 @@ def add_travel_buddy(name, common_route):
 
 def init_session_state():
     """Initialize all session state variables"""
-    # Initialize if not already initialized
     if 'initialized' not in st.session_state:
         st.session_state.initialized = True
-        # Initialize all required session state variables
-        st.session_state.travel_data = []
-        st.session_state.carbon_footprint = 0
-        st.session_state.eco_points = 0
-        st.session_state.active_challenges = []
-        st.session_state.completed_challenges = []
-        st.session_state.milestones = {
-            'bike_distance': 0,
-            'walk_distance': 0,
-            'carpool_distance': 0,
-            'public_transit_distance': 0,
-            'ev_distance': 0
-        }
-        st.session_state.badges = []
-        st.session_state.travel_buddies = []
-        st.session_state.suggestion_history = []
+        reset_session_state()
+    elif 'last_user' not in st.session_state or st.session_state.last_user != st.session_state.user:
+        # Reset data if user changed
+        reset_session_state()
+        st.session_state.last_user = st.session_state.user
 
-    # Ensure all required variables exist even if initialized
-    required_vars = {
-        'travel_data': [],
-        'carbon_footprint': 0,
-        'eco_points': 0,
-        'active_challenges': [],
-        'completed_challenges': [],
-        'badges': [],
-        'travel_buddies': [],
-        'suggestion_history': []
+def reset_session_state():
+    """Reset all session state variables to default values"""
+    st.session_state.travel_data = []
+    st.session_state.carbon_footprint = 0
+    st.session_state.eco_points = 0
+    st.session_state.active_challenges = []
+    st.session_state.completed_challenges = []
+    st.session_state.milestones = {
+        'bike_distance': 0,
+        'walk_distance': 0,
+        'carpool_distance': 0,
+        'public_transit_distance': 0,
+        'ev_distance': 0
     }
-
-    # Add any missing variables
-    for var, default in required_vars.items():
-        if var not in st.session_state:
-            setattr(st.session_state, var, default)
-
-    # Ensure milestones exist
-    if 'milestones' not in st.session_state:
-        st.session_state.milestones = {
-            'bike_distance': 0,
-            'walk_distance': 0,
-            'carpool_distance': 0,
-            'public_transit_distance': 0,
-            'ev_distance': 0
-        }
+    st.session_state.badges = []
+    st.session_state.travel_buddies = []
+    st.session_state.suggestion_history = []
 
 def main(auth=None):
     """Main function for the transportation app"""
