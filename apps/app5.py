@@ -8,6 +8,8 @@ import random
 import google.generativeai as genai
 from PIL import Image
 import matplotlib.pyplot as plt
+import plotly.express as px
+from datetime import datetime, timedelta, date 
 
 # Waste Management Constants
 FOOD_CATEGORIES = {
@@ -253,6 +255,7 @@ def initialize_scavenger_hunt():
     return tasks
 
 def get_garden_image(level, plants):
+    """Create garden visualization with the updated parameter"""
     # Create visualization with enhanced styling
     fig, ax = plt.subplots(figsize=(12, 6), facecolor='#1a1a1a')
     ax.set_facecolor('#1a1a1a')
@@ -274,7 +277,7 @@ def get_garden_image(level, plants):
         x = i + 0.5
         height = 1 + (level * 0.5)
         
-        # Animated growth effect
+        # Growth effect
         growth_factor = np.sin(i/2) * 0.2 + 1
         height *= growth_factor
         
@@ -300,27 +303,20 @@ def get_garden_image(level, plants):
     ax.set_title("Compost Garden", color='white', pad=20)
     ax.set_axis_off()
     
-    # Update grid and spine colors for dark theme
+    # Update grid and spine colors
     for spine in ax.spines.values():
         spine.set_color('#424242')
         
     plt.tight_layout()
     
-    # Convert plot to image using a different method
+    # Convert plot to image
     fig.canvas.draw()
-    
-    # Get the RGBA buffer from the figure
     w, h = fig.canvas.get_width_height()
     buf = np.frombuffer(fig.canvas.buffer_rgba(), dtype=np.uint8)
     buf.shape = (h, w, 4)
-    
-    # Convert to RGB
     buf = buf[:, :, :3]
     
-    # Close the figure to free memory
     plt.close(fig)
-    
-    # Convert to PIL Image
     img = Image.fromarray(buf)
     return img
 
@@ -433,25 +429,16 @@ def render_scavenger_hunt():
     st.markdown("</div>", unsafe_allow_html=True)
 
 def render_compost_garden():
+    """Display garden with updated parameter"""
     st.subheader("Compost Garden")
     
-    # Display current garden level and status
-    if st.session_state.user_data['garden']['level'] == 1:
-        st.markdown("🌱 **Level 1 Garden**")
-        st.markdown("Your garden is just starting! Add compost to help it grow.")
-    elif st.session_state.user_data['garden']['level'] == 2:
-        st.markdown("🌿 **Level 2 Garden**")
-        st.markdown("Your garden is flourishing! Keep up the great work.")
-    else:
-        st.markdown("🌳 **Level 3 Garden**")
-        st.markdown("Your garden is thriving! You're a composting master.")
-
-    # Garden visualization
+    # Get garden image
     garden_image = get_garden_image(
         st.session_state.user_data['garden']['level'],
         st.session_state.user_data['garden']['plants']
     )
-    st.image(garden_image, use_column_width=True)
+    # Use new parameter name
+    st.image(garden_image, use_container_width=True)
     
     col1, col2 = st.columns(2)
     with col1:
@@ -465,10 +452,12 @@ def render_compost_garden():
             st.session_state.user_data['garden']['level'] = 2
             add_points(50)
             st.success("🎉 Your garden grew to Level 2!")
+            auto_save_on_action()
         elif st.session_state.user_data['garden']['plants'] >= 10 and st.session_state.user_data['garden']['level'] == 2:
             st.session_state.user_data['garden']['level'] = 3
             add_points(100)
             st.success("🎉 Congratulations! Your garden reached Level 3!")
+            auto_save_on_action()
 
 def render_waste_analysis():
     st.subheader("Waste Analysis & Insights")
@@ -482,11 +471,23 @@ def render_waste_analysis():
         total_composting = sum(st.session_state.user_data['composting_history'][-4:]) if st.session_state.user_data['composting_history'] else 0
         st.metric("Monthly Composting", f"{total_composting:.1f} kg")
     with col3:
-        trash_reduction = ((st.session_state.user_data['weekly_trash'] - (sum(st.session_state.user_data['trash_history'][-4:])/4)) / st.session_state.user_data['weekly_trash'] * 100) if st.session_state.user_data['trash_history'] else 0
-        st.metric("Trash Reduction", f"{trash_reduction:.1f}%")
+        if st.session_state.user_data['trash_history']:
+            current_trash = sum(st.session_state.user_data['trash_history'][-4:])/4
+            # Add check for zero division
+            if st.session_state.user_data['weekly_trash'] > 0:
+                reduction = ((st.session_state.user_data['weekly_trash'] - current_trash) / 
+                            st.session_state.user_data['weekly_trash'] * 100)
+                st.metric("Waste Reduction", f"{reduction:.1f}%", 
+                         delta="↓ Good" if reduction > 0 else "↑ Need improvement")
+            else:
+                st.metric("Waste Reduction", "0%", 
+                         delta="No baseline data")
+        else:
+            st.metric("Waste Reduction", "0%", 
+                     delta="No historical data")
 
 def render_waste_management_form():
-    st.title("Waste Management & Recycling Insights")
+    st.title("♻️ Waste Management & Recycling Insights")
     
     tabs = st.tabs(["Track Waste", "Set Goals", "View Insights", "Get Tips"])
     
@@ -517,6 +518,9 @@ def render_waste_management_form():
                 # Check for achievements
                 check_waste_achievements()
                 st.success(f"Waste data logged successfully! Earned {points} points!")
+                
+                # Auto-save progress
+                auto_save_on_action()
     
     with tabs[1]:
         st.subheader("Monthly Goals")
@@ -529,6 +533,122 @@ def render_waste_management_form():
             st.metric("Composting Goal",
                      f"{st.session_state.monthly_goal['composting']} kg",
                      f"{calculate_goal_progress('composting')}% complete")
+
+    # View Insights Tab
+    with tabs[2]:
+        st.subheader("Your Waste Management Insights")
+        
+        # Show metrics in cards
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            total_recycling = sum(st.session_state.user_data['recycling_history'][-4:]) if st.session_state.user_data['recycling_history'] else 0
+            st.metric("Monthly Recycling", f"{total_recycling:.1f} kg", 
+                     delta="↑ 15%" if total_recycling > 0 else None)
+        
+        with col2:
+            total_composting = sum(st.session_state.user_data['composting_history'][-4:]) if st.session_state.user_data['composting_history'] else 0
+            st.metric("Monthly Composting", f"{total_composting:.1f} kg",
+                     delta="↑ 20%" if total_composting > 0 else None)
+        
+        with col3:
+            if st.session_state.user_data['trash_history']:
+                current_trash = sum(st.session_state.user_data['trash_history'][-4:])/4
+                # Add check for zero division
+                if st.session_state.user_data['weekly_trash'] > 0:
+                    reduction = ((st.session_state.user_data['weekly_trash'] - current_trash) / 
+                                st.session_state.user_data['weekly_trash'] * 100)
+                    st.metric("Waste Reduction", f"{reduction:.1f}%", 
+                             delta="↓ Good" if reduction > 0 else "↑ Need improvement")
+                else:
+                    st.metric("Waste Reduction", "0%", 
+                             delta="No baseline data")
+            else:
+                st.metric("Waste Reduction", "0%", 
+                         delta="No historical data")
+
+        # Progress Charts
+        if st.session_state.user_data['recycling_history']:
+            st.subheader("Recycling Progress")
+            recycling_data = pd.DataFrame({
+                'Week': range(1, len(st.session_state.user_data['recycling_history']) + 1),
+                'Amount (kg)': st.session_state.user_data['recycling_history']
+            })
+            st.line_chart(recycling_data.set_index('Week'))
+
+        # Waste Composition Breakdown
+        st.subheader("Waste Composition")
+        waste_types = {
+            'Recyclables': total_recycling,
+            'Compost': total_composting,
+            'General Waste': st.session_state.user_data['weekly_trash'] * 4
+        }
+        
+        fig = px.pie(values=list(waste_types.values()), 
+                    names=list(waste_types.keys()),
+                    title="Monthly Waste Distribution")
+        st.plotly_chart(fig)
+
+    # Get Tips Tab
+    with tabs[3]:
+        st.subheader("Personalized Waste Reduction Tips")
+        
+        # Get user's waste management profile
+        user_profile = {
+            'weekly_trash': st.session_state.user_data['weekly_trash'],
+            'recycling_habit': st.session_state.user_data.get('recycling_habit', 'Sometimes'),
+            'composting_habit': st.session_state.user_data.get('composting_habit', 'Never'),
+            'plastic_usage': st.session_state.user_data.get('plastic_usage', 'Moderate')
+        }
+        
+        if st.button("Get New Tips"):
+            with st.spinner("Generating personalized recommendations..."):
+                recommendations = get_waste_recommendations(user_profile)
+                if recommendations:
+                    tips = recommendations.split('\n')
+                    for tip in tips:
+                        if tip.strip():
+                            st.markdown(f"🌱 {tip.strip()}")
+                else:
+                    st.warning("Unable to generate tips at the moment. Here are some general tips:")
+                    st.markdown("""
+                    * Start a compost bin for food scraps and yard waste
+                    * Use reusable shopping bags and containers
+                    * Properly sort recyclables to avoid contamination
+                    * Buy items with minimal packaging
+                    * Repair items instead of replacing them when possible
+                    """)
+        
+        # Quick Reference Guide
+        st.subheader("Quick Reference Guide")
+        with st.expander("Recycling Guide"):
+            st.markdown("""
+            ♻️ **Common Recyclables:**
+            * Paper and cardboard
+            * Glass bottles and jars
+            * Metal cans and containers
+            * Plastic bottles and containers (check numbers)
+            * Clean aluminum foil
+            """)
+            
+        with st.expander("Composting Guide"):
+            st.markdown("""
+            🌱 **Compostable Items:**
+            * Fruit and vegetable scraps
+            * Coffee grounds and filters
+            * Tea bags
+            * Eggshells
+            * Yard trimmings
+            """)
+            
+        with st.expander("Waste Reduction Tips"):
+            st.markdown("""
+            📝 **Daily Habits:**
+            * Carry reusable water bottles and coffee cups
+            * Pack lunch in reusable containers
+            * Say no to single-use plastics
+            * Shop with reusable bags
+            * Buy in bulk to reduce packaging
+            """)
 
 def calculate_goal_progress(goal_type):
     """Calculate progress towards monthly goals"""
@@ -674,6 +794,25 @@ def render_sidebar():
             int(st.session_state.monthly_goal['trash_reduction'])
         )
 
+def auto_save_on_action():
+    """Automatically save progress if auth is available"""
+    if 'auth' in st.session_state and 'user' in st.session_state:
+        progress_data = {
+            'points': st.session_state.user_data['points'],
+            'level': st.session_state.user_data['level'],
+            'activities': st.session_state.user_data['activities'],
+            'recycling_history': st.session_state.user_data['recycling_history'],
+            'composting_history': st.session_state.user_data['composting_history'],
+            'trash_history': st.session_state.user_data['trash_history'],
+            'badges': st.session_state.user_data['badges'],
+            'garden': st.session_state.user_data['garden'],
+            'bingo_board': st.session_state.user_data.get('bingo_board', {}),
+            'scavenger_hunt': st.session_state.user_data.get('scavenger_hunt', []),
+            'monthly_goal': st.session_state.monthly_goal,
+            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        st.session_state.auth.save_progress(st.session_state.user, "waste", json.dumps(progress_data))
+
 def render_main_app():
     render_sidebar()
     if st.session_state.show_bingo:
@@ -691,57 +830,92 @@ def init_session_state():
     """Initialize session state variables"""
     if 'user_data' not in st.session_state:
         st.session_state.user_data = {
+            'level': 'Waste Reducer',  
+            'points': 0,
+            'activities': [],
+            'challenges': [],
+            'completed_challenges': [],
+            'badges': [],
+            'water_saved': 0,
+            'streak': 0,
+            'last_activity_date': None,
+            'conservation_tips': [],
             'recycling_history': [],
             'composting_history': [],
             'trash_history': [],
-            'points': 0,
-            'level': "Waste Reducer",
-            'badges': [],
-            'bingo_board': {},
-            'bingo_progress': [],
-            'completed_bingos': 0,
-            'scavenger_hunt': {},
-            'scavenger_completed': [],
+            'weekly_trash': 0,  # Initialize weekly_trash
             'garden': {
                 'level': 1,
                 'plants': 0
+            }
+        }
+    else:
+        # Ensure all required keys exist
+        required_keys = {
+            'level': 'Waste Reducer',
+            'points': 0,
+            'activities': [],
+            'challenges': [],
+            'completed_challenges': [],
+            'badges': [],
+            'water_saved': 0,
+            'streak': 0,
+            'spin_available': False,
+            'last_activity_date': None,
+            'recycling_history': [],
+            'composting_history': [],
+            'trash_history': [],
+            'weekly_trash': 0,
+            'garden': {         # Add garden to required keys
+                'level': 1,
+                'plants': 0
             },
-            'household_size': 2,
-            'has_recycling': True,
-            'has_composting': False,
-            'weekly_trash': 20,
-            'recycling_habit': 'Usually',
-            'composting_habit': 'Never',
-            'plastic_usage': 'Sometimes',
-            'paper_usage': 'Moderate',
-            'reusable_items': ['Shopping Bags'],
-            'waste_reduction': ''
+            'history': []
         }
-
-    # Ensure all required keys exist
-    required_keys = {
-        'recycling_history': [],
-        'composting_history': [],
-        'trash_history': [],
-        'points': 0,
-        'level': "Waste Reducer",
-        'badges': [],
-        'bingo_board': {},
-        'monthly_goals': {
-            'recycling': 0,
-            'composting': 0,
-            'trash_reduction': 0
-        }
-    }
-
-    # Initialize missing keys
-    for key, default_value in required_keys.items():
-        if key not in st.session_state.user_data:
-            st.session_state.user_data[key] = default_value
+        
+        # Add any missing keys
+        for key, default_value in required_keys.items():
+            if key not in st.session_state.user_data:
+                st.session_state.user_data[key] = default_value
 
 def main(auth):
     # Add initialization call at the start of main
     init_session_state()
+
+    # Function to save progress
+    def save_progress():
+        """Save progress if auth is available"""
+        if auth and 'user' in st.session_state:
+            progress_data = {
+                'level': st.session_state.user_data['level'],
+                'points': st.session_state.user_data['points'],
+                'activities': st.session_state.user_data['activities'],
+                'recycling_history': st.session_state.user_data['recycling_history'],
+                'composting_history': st.session_state.user_data['composting_history'],
+                'trash_history': st.session_state.user_data['trash_history'],
+                'garden': st.session_state.user_data['garden'],
+                'badges': st.session_state.user_data['badges'],
+                'bingo_board': st.session_state.user_data.get('bingo_board', {}),
+                'scavenger_hunt': st.session_state.user_data.get('scavenger_hunt', []),
+                'monthly_goal': st.session_state.monthly_goal,
+                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            }
+            auth.save_progress(st.session_state.user, "waste", json.dumps(progress_data))
+            st.success("Progress saved!")
+        else:
+            st.warning("Progress saving is only available when running as part of the main app.")
+
+    # Add save button in sidebar only if auth is available
+    if auth:
+        st.sidebar.markdown("---")
+        if st.sidebar.button("💾 Save Progress"):
+            save_progress()
+
+    # Automatic save after significant actions
+    def auto_save_on_action():
+        """Automatically save progress if auth is available"""
+        if auth and 'user' in st.session_state:
+            save_progress()
 
     # Initialize session state variables if they don't exist
     if 'user_data' not in st.session_state:
@@ -812,120 +986,6 @@ def main(auth):
             'composting': 0,
             'trash_reduction': 0
         }
-
-    def save_progress():
-        # Save current state to database
-        progress_data = {
-            'recycling_history': st.session_state.user_data['recycling_history'],
-            'composting_history': st.session_state.user_data['composting_history'],
-            'trash_history': st.session_state.user_data['trash_history'],
-            'level': st.session_state.user_data['level'],
-            'points': st.session_state.user_data['points'],
-            'badges': st.session_state.user_data['badges'],
-            'bingo_board': st.session_state.user_data['bingo_board'],
-            'bingo_progress': st.session_state.user_data['bingo_progress'],
-            'completed_bingos': st.session_state.user_data['completed_bingos'],
-            'scavenger_hunt': st.session_state.user_data['scavenger_hunt'],
-            'scavenger_completed': st.session_state.user_data['scavenger_completed'],
-            'garden': st.session_state.user_data['garden'],
-            'household_size': st.session_state.user_data['household_size'],
-            'has_recycling': st.session_state.user_data['has_recycling'],
-            'has_composting': st.session_state.user_data['has_composting'],
-            'weekly_trash': st.session_state.user_data['weekly_trash'],
-            'recycling_habit': st.session_state.user_data['recycling_habit'],
-            'composting_habit': st.session_state.user_data['composting_habit'],
-            'plastic_usage': st.session_state.user_data['plastic_usage'],
-            'paper_usage': st.session_state.user_data['paper_usage'],
-            'reusable_items': st.session_state.user_data['reusable_items'],
-            'waste_reduction': st.session_state.user_data['waste_reduction'],
-            'monthly_goal': st.session_state.monthly_goal,
-            'timestamp': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
-        if auth:
-            auth.save_progress(st.session_state.user, "waste", json.dumps(progress_data))
-            st.success("Progress saved successfully!")
-
-    def render_sidebar():
-        st.sidebar.markdown("""
-            <div style='text-align: center; padding: 1rem;'>
-                <h2 style='color: #2ecc71;'>🌿 Your Progress</h2>
-            </div>
-        """, unsafe_allow_html=True)
-
-        # Level and points display
-        st.sidebar.markdown(f"""
-            <div class='metric-container'>
-                <div class='metric-value'>{st.session_state.user_data['level']}</div>
-                <div class='metric-label'>Current Level</div>
-            </div>
-        """, unsafe_allow_html=True)
-
-        # Progress bar with animation
-        progress = min(st.session_state.user_data['points'] / 1000, 1.0)
-        st.sidebar.markdown(f"""
-            <div class='level-indicator'>
-                <div class='level-dot {"active" if progress >= 0.25 else ""}'></div>
-                <div class='level-dot {"active" if progress >= 0.5 else ""}'></div>
-                <div class='level-dot {"active" if progress >= 0.75 else ""}'></div>
-                <div class='level-dot {"active" if progress >= 1.0 else ""}'></div>
-            </div>
-        """, unsafe_allow_html=True)
-
-        st.sidebar.header("Activities")
-        if st.sidebar.button("Waste Management Details"):
-            st.session_state.show_bingo = False
-            st.session_state.show_scavenger = False
-            st.session_state.show_garden = False
-            st.session_state.show_analysis = False
-
-        if st.sidebar.button("Recycling Bingo"):
-            if 'bingo_board' not in st.session_state.user_data or not st.session_state.user_data['bingo_board']:
-                st.session_state.user_data['bingo_board'] = initialize_bingo_board()
-            st.session_state.show_bingo = True
-            st.session_state.show_scavenger = False
-            st.session_state.show_garden = False
-            st.session_state.show_analysis = False
-
-        if st.sidebar.button("Eco Scavenger Hunt"):
-            if 'scavenger_hunt' not in st.session_state.user_data or not st.session_state.user_data['scavenger_hunt']:
-                st.session_state.user_data['scavenger_hunt'] = initialize_scavenger_hunt()
-            st.session_state.show_bingo = False
-            st.session_state.show_scavenger = True
-            st.session_state.show_garden = False
-            st.session_state.show_analysis = False
-
-        if st.sidebar.button("Compost Garden"):
-            st.session_state.show_bingo = False
-            st.session_state.show_scavenger = False
-            st.session_state.show_garden = True
-            st.session_state.show_analysis = False
-
-        st.sidebar.header("Monthly Goals")
-        with st.sidebar.expander("Set Monthly Goals"):
-            st.session_state.monthly_goal['recycling'] = st.slider(
-                "Recycling Goal (kg)", 0, 50,
-                int(st.session_state.monthly_goal['recycling']))
-
-            st.session_state.monthly_goal['composting'] = st.slider(
-                "Composting Goal (kg)", 0, 30,
-                int(st.session_state.monthly_goal['composting']))
-
-            st.session_state.monthly_goal['trash_reduction'] = st.slider(
-                "Trash Reduction Goal (%)", 0, 100,
-                int(st.session_state.monthly_goal['trash_reduction']))
-
-    def render_main_app():
-        render_sidebar()
-        if st.session_state.show_bingo:
-            render_recycling_bingo()
-        elif st.session_state.show_scavenger:
-            render_scavenger_hunt()
-        elif st.session_state.show_garden:
-            render_compost_garden()
-        elif st.session_state.show_analysis:
-            render_waste_analysis()
-        else:
-            render_waste_management_form()
 
     # Run the main app
     render_main_app()
