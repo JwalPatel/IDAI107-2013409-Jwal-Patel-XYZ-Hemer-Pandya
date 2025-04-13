@@ -34,6 +34,14 @@ if 'model' not in st.session_state:
     st.session_state.model = model
 
 def main():
+    # Add this before authentication UI
+    st.markdown("""
+        <div style='text-align: center; padding: 20px;'>
+            <h1 style='color: #1e88e5;'>🌍 Eco Action</h1>
+            <p style='font-size: 1.2em; color: #ffffff;'>Make your life more efficient and sustainable</p>
+        </div>
+    """, unsafe_allow_html=True)
+
     # Authentication UI
     if not st.session_state.user:
         st.markdown("<div class='auth-container'>", unsafe_allow_html=True)
