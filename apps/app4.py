@@ -584,11 +584,15 @@ def render_challenges_section():
 # Main app
 def main(auth=None):
     """Main function for the food app"""
+    st.title("🥗 EcoWise Food Planner")
+    
+    # Add custom CSS to make the title white
     st.markdown("""
-        <div style='text-align: center; padding: 20px;'>
-            <h1 style='color: #4CAF50;'>🥗 EcoWise Food Planner</h1>
-            <p style='font-size: 1.2em;'>Make sustainable food choices</p>
-        </div>
+        <style>
+        .stTitle {
+            color: white !important;
+        }
+        </style>
     """, unsafe_allow_html=True)
     
     init_session_state()
@@ -615,7 +619,7 @@ def main(auth=None):
             }
             st.session_state.seasonal_points = data.get('seasonal_points', {})
     
-    st.write("Track your meals, reduce your carbon footprint, and make sustainable food choices!")
+    #st.write("Track your meals, reduce your carbon footprint, and make sustainable food choices!")
     
     # Navigation
     tab1, tab2, tab3 = st.tabs(["Log Meal", "Dashboard", "Analytics"])
