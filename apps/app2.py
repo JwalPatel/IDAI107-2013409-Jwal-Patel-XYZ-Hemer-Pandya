@@ -11,8 +11,6 @@ import json
 
 st.markdown("""
     <div style='text-align: center; padding: 20px;'>
-        <h1 style='color: #1e88e5;'>🌿 Eco Action</h1>
-        <p style='font-size: 1.2em; color: #ffffff;'>Make your life more efficient and sustainable</p>
     </div>
 """, unsafe_allow_html=True)
 
@@ -480,7 +478,7 @@ def main(auth=None):
     st.session_state.initialized = True
 
     # Move header before tabs
-    st.header("Energy Usage Information")
+    st.title("⚡ Energy Efficiency Advisor")
     
     # Create tabs after header
     tab1, tab2, tab3, tab4 = st.tabs(["📝 Input Data", "📊 Analysis & Recommendations", "📈 Progress Tracking", "🎮 Energy Quiz"])
