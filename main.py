@@ -1,4 +1,9 @@
 import streamlit as st
+from utils import init_app
+import sys
+import os
+import json
+
 
 # Page config must be the first Streamlit command
 st.set_page_config(
@@ -7,10 +12,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-from utils import init_app
-import sys
-import os
 
 # Add the apps directory to Python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -136,20 +137,36 @@ def show_dashboard():
     with col4:
         st.metric("Energy Reduced", "28 kWh", "-5%")
 
-    # Feature completion
+    # Feature completion - Updated calculation
     st.subheader("Feature Completion")
     features = ["Transportation", "Energy", "Water", "Food", "Waste"]
     for feature in features:
-        feature_progress = len(progress[progress['feature'] == feature.lower()])
-        st.progress(min(1.0, feature_progress/10))
-        st.caption(f"{feature}: {feature_progress*10}% complete")
-
-    # Recent activity
-    st.subheader("Recent Activity")
-    if not progress.empty:
-        recent = progress.sort_values('timestamp', ascending=False).head(5)
-        for _, row in recent.iterrows():
-            st.markdown(f"**{row['feature'].title()}**: {row['timestamp']}")
+        feature_data = progress[progress['feature'] == feature.lower()]
+        if not feature_data.empty:
+            latest_data = json.loads(feature_data.iloc[-1]['data'])
+            # Calculate progress based on feature-specific metrics
+            if feature == "Transportation":
+                eco_points = latest_data.get('eco_points', 0)
+                travel_data = latest_data.get('travel_data', [])
+                milestones = latest_data.get('milestones', {})
+                
+                # Calculate progress from multiple factors
+                points_progress = min(1.0, eco_points/1000)  # Max 1000 points
+                travel_progress = min(1.0, len(travel_data)/10)  # Max 10 trips
+                milestone_progress = min(1.0, sum(milestones.values())/500)  # Max 500 miles total
+                
+                # Combined weighted progress
+                feature_progress = (points_progress * 0.4 + 
+                                  travel_progress * 0.3 + 
+                                  milestone_progress * 0.3)
+            else:
+                feature_progress = len(feature_data)/10
+        else:
+            feature_progress = 0.0
+        
+        # Display progress bar and percentage
+        st.progress(feature_progress)
+        st.caption(f"{feature}: {int(feature_progress*100)}% complete")
 
 if __name__ == "__main__":
     main()
