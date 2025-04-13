@@ -374,7 +374,7 @@ def main(auth=None):
             st.warning("Progress saving is only available when running as part of the main app.")
 
     # App layout and functionality
-    st.title("Water Conservation Advisor")
+    st.title("💧 Water Conservation Advisor")
 
     # Sidebar for user stats and gamification
     with st.sidebar:
@@ -608,4 +608,4 @@ def main(auth=None):
         st.sidebar.success("All data reset!")
 
 if __name__ == "__main__":
-    main()  # Run standalone without auth
+    main()  
