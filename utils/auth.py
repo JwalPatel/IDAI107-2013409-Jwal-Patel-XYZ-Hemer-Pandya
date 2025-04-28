@@ -16,15 +16,47 @@ class Auth:
         data_dir = os.path.dirname(self.users_file)
         os.makedirs(data_dir, exist_ok=True)
 
-        # Initialize users.csv if it doesn't exist
         if not os.path.exists(self.users_file):
             df = pd.DataFrame(columns=['username', 'password', 'name', 'email'])
             df.to_csv(self.users_file, index=False)
-            print(f"Created new users file at {self.users_file}")
 
     def _hash_password(self, password):
         """Hash password using SHA-256"""
         return hashlib.sha256(password.encode()).hexdigest()
+
+    def login_user(self, username, password):
+        """Authenticate user login"""
+        try:
+            # Input validation
+            if not username or not password:
+                return False, "Username and password are required"
+
+            # Get user data from GitHub first
+            try:
+                github_users = self.github_storage.get_users_data()
+                if github_users is not None:
+                    users_df = github_users
+                else:
+                    users_df = pd.read_csv(self.users_file)
+            except Exception:
+                # Fallback to local file if GitHub fails
+                users_df = pd.read_csv(self.users_file)
+
+            # Check if user exists
+            user = users_df[users_df['username'] == username]
+            if user.empty:
+                return False, "Invalid username or password"
+
+            # Verify password
+            hashed_password = self._hash_password(password)
+            if user.iloc[0]['password'] != hashed_password:
+                return False, "Invalid username or password"
+
+            return True, "Login successful"
+
+        except Exception as e:
+            print(f"Login error: {str(e)}")
+            return False, f"Login failed: {str(e)}"
 
     def register_user(self, username, password, name, email):
         """Register a new user"""
